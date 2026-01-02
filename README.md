@@ -10,8 +10,9 @@ The solution implements a modern cloud-based analytics pipeline on AWS, integrat
 
 | File | Purpose |
 |------|--------|
-| `BUSINESS_DOCUMENTATION.md` | Business case, stakeholders, KPIs, architecture, business value |
-| `IMPLEMENTATION.md` | Technical execution, AWS services, SQL queries, and analytical results |
+| [BUSINESS_DOCUMENTATION.md](BUSINESS_DOCUMENTATION.md) | Business case, stakeholders, KPIs, architecture, value |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | Technical execution, AWS services, SQL queries, results interpretation |
+
 
 ---
 
