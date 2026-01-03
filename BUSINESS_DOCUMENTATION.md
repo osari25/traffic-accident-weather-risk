@@ -142,3 +142,63 @@ Does weather significantly change the expected workload for first responders?
 This KPI highlights the difference between average accident volume in normal vs risky weather. If this difference is meaningful, emergency services can benefit from adjusting readiness and staffing according to forecasted conditions.
 
 ---
+
+---
+
+## 4️. Operational Outcomes & Recommendations
+
+While the project was primarily analytical, the goal was always to deliver **practical business insight** for emergency services and public safety planning. Based on the analysis results, the following conclusions can be drawn.
+
+---
+
+### When are accidents most likely to increase?
+
+#### 4.1 Strong Wind Conditions
+Wind showed the clearest measurable relationship with increased accident occurrence.  
+This suggests that vehicle control becomes more difficult and road environments become riskier during windy periods.
+
+**Operational implication:**  
+Emergency services should consider higher readiness levels when strong winds are forecasted.
+
+---
+
+#### 4.2 Rainy Weather – Especially on B-Roads
+Rain showed meaningful behavioral and environmental impact:
+
+- Light rain still results in a large number of accidents.
+- B-class roads (road class 3) experience the highest number of rain-related accidents.
+- Motorways and major A-roads appear less affected, likely due to better infrastructure.
+
+**Operational implication:**  
+Ambulance, police and fire units should expect more calls in rainy conditions, especially on secondary roads rather than highways.
+
+---
+
+#### 4.3️ Temperature Effects Exist but Are Less Dominant
+Most accidents occur between **0–10°C and 10–20°C**, which matches normal driving seasons.  
+Extreme temperatures did not produce significant spikes.
+
+**Operational implication:**  
+Temperature alone is not a strong enough driver to justify staffing changes, but should be considered in combination with wind and rain.
+
+---
+
+## 5. Business Value Summary
+
+From a decision-making perspective, this project provides meaningful guidance:
+
+- Helps **anticipate demand** instead of reacting to it  
+- Supports **staffing and scheduling decisions**
+- Enables **data-backed justification** for resourcing choices
+- Improves preparedness for **high-risk weather conditions**
+
+In practical terms, emergency services should consider increased readiness when:
+
+- Strong winds are forecasted  
+- Rain is expected, particularly affecting B-roads  
+- Combined weather risk factors appear together
+
+This transforms weather data into **actionable public safety intelligence**, supporting smarter, safer and more efficient emergency operations.
+
+---
+
