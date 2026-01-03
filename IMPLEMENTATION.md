@@ -275,6 +275,308 @@ These tables then became accessible in Athena for querying and transformation.
 
 ---
 
+# 6️. Amazon Athena – Data Processing & Analytics
+
+Amazon Athena was used to:
+- transform raw datasets  
+- join accident + weather data  
+- create a curated analytics table  
+- execute analytical queries to answer business questions
+
+All queries were executed in the `traffic_project_db` database.
+
+---
+
+## 6.1 Creating a Simplified Weather Table
+
+The raw weather JSON structure contains **hourly arrays**, which are difficult to query directly.  
+Therefore, an aggregated daily weather table was created using Athena:
+
+```sql
+CREATE TABLE traffic_project_db.simple_weather AS
+SELECT
+    substr(time, 1, 10) AS iso_date,      
+    AVG(hourly.temperature_2m[idx]) AS avg_temp,
+    AVG(hourly.wind_speed_10m[idx]) AS avg_wind,
+    SUM(hourly.precipitation[idx]) AS total_precip
+FROM traffic_project_db.raw_raw_weather_imr3jw
+CROSS JOIN UNNEST(hourly.time) WITH ORDINALITY AS t(time, idx)
+GROUP BY 1
+ORDER BY 1;
+```
+
+This table converts hourly weather into daily aggregated values.
+
+![Completed Athena code](athena_completed.png)
+![Preview of simple_weather table](simple-weather-table.png)
+
+---
+
+## 6.2 Creating the Curated Accident + Weather Table
+
+Next, a curated analytics dataset was created by **joining accidents with weather** based on date.
+
+```sql
+CREATE TABLE traffic_project_db.curated_accident_weather
+WITH (
+    format = 'PARQUET',
+    external_location = 's3://traffic-accident-weather-sara/curated-imr3jw/'
+) AS
+SELECT
+    a.*,
+    w.avg_temp,
+    w.avg_wind,
+    w.total_precip
+FROM traffic_project_db.raw_raw_accidents_imr3jw a
+LEFT JOIN traffic_project_db.simple_weather w
+    ON
+        CASE
+            WHEN a.date IS NULL OR a.date = '' THEN NULL
+            ELSE date_format(
+                date_parse(a.date, '%d/%m/%Y'),
+                '%Y-%m-%d'
+            )
+        END = w.iso_date
+WHERE a.date IS NOT NULL
+  AND a.date <> '';
+```
+
+Result:
+- Stored as **Parquet** (faster + cheaper queries)
+- Saved in curated S3 folder
+- Ready for analysis
+
+![Table Preview](curated_accident_weather-table-preview.csv)
+
+---
+
+# 7️. Analytical Queries & Findings
+
+The curated dataset was analyzed to answer business questions supporting emergency response planning.
+
+---
+
+## 7.1  Does rain increase accidents?
+
+```sql
+SELECT
+    CASE 
+        WHEN total_precip = 0 THEN 'No Rain'
+        WHEN total_precip BETWEEN 0 AND 5 THEN 'Light Rain'
+        ELSE 'Heavy Rain'
+    END AS rain_group,
+    COUNT(*) AS accidents
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY accidents DESC;
+```
+![Query result](sql_result_1.png)
+
+**Conclusion:**  
+Most accidents occur during **light rain**, while heavy rain shows the lowest number.  
+This may indicate that extreme rain leads to more careful driving, while light rain still degrades safety.
+
+---
+
+## 7.2  Are accidents more frequent at certain temperatures?
+
+```sql
+SELECT
+    CASE
+        WHEN avg_temp < 0 THEN 'Below 0°C'
+        WHEN avg_temp BETWEEN 0 AND 10 THEN '0–10°C'
+        WHEN avg_temp BETWEEN 10 AND 20 THEN '10–20°C'
+        ELSE '20°C+'
+    END AS temp_group,
+    COUNT(*) AS accidents
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY accidents DESC;
+```
+
+![Query result](sql_result_2.png)
+
+**Conclusion:**  
+Accidents are most frequent in **moderate temperatures (0–20°C)**, with the highest number occurring between **0–10°C**. Very few accidents occur in extreme cold or heat, suggesting temperature alone is not a major risk factor.
+
+---
+
+## 7.3 Do higher wind speeds increase accidents?
+
+```sql
+SELECT
+    CASE
+        WHEN avg_wind < 5 THEN 'Low Wind'
+        WHEN avg_wind BETWEEN 5 AND 10 THEN 'Moderate Wind'
+        ELSE 'High Wind'
+    END AS wind_group,
+    COUNT(*) AS accidents
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY accidents DESC;
+```
+![Query result](sql_result_3.png)
+**Conclusion:**  
+Yes, significantly more accidents occur in windy conditions.  
+Wind bucket thresholds were validated using the **Beaufort Wind Scale**, so this classification is meteorologically meaningful.
+
+---
+
+## 7.4  Are casualty severities worse in extreme temperatures?
+
+```sql
+SELECT
+    CASE
+        WHEN avg_temp < 0 THEN 'Below 0°C'
+        WHEN avg_temp BETWEEN 0 AND 10 THEN '0–10°C'
+        WHEN avg_temp BETWEEN 10 AND 20 THEN '10–20°C'
+        ELSE '20°C+'
+    END AS temp_group,
+    AVG(CAST("casualty class" AS DOUBLE)) AS avg_severity
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY avg_severity DESC;
+```
+![Query result](sql_result_4.png)
+
+**Clarification:**
+
+| casualty class | meaning |
+|----------------|--------|
+| 1 | Fatal |
+| 2 | Serious |
+| 3 | Slight |
+
+**Interpretation:**  
+Fatal accidents occur most frequently in **20°C+ warm weather**,  
+while **0–10°C** tends to result in less severe outcomes.
+
+---
+
+## 7.5  Does wind affect severity?
+
+```sql
+SELECT
+    CASE
+        WHEN avg_wind < 5 THEN 'Low Wind'
+        WHEN avg_wind BETWEEN 5 AND 10 THEN 'Moderate Wind'
+        WHEN avg_wind BETWEEN 10 AND 20 THEN 'Strong Wind'
+        ELSE 'Extreme Wind'
+    END AS wind_group,
+    AVG(CAST("casualty class" AS DOUBLE)) AS avg_severity,
+    COUNT(*) AS accident_count
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY avg_severity ASC;
+```
+![Query result](sql_result_5.png)
+
+**Conclusion:**  
+Differences are small, **no meaningful severity impact** detected.
+
+---
+
+## 7.6 Does rain cause accidents with more vehicles involved?
+
+```sql
+SELECT
+    CASE 
+        WHEN total_precip = 0 THEN 'No Rain'
+        WHEN total_precip BETWEEN 0 AND 5 THEN 'Light Rain'
+        ELSE 'Heavy Rain'
+    END AS rain_group,
+    AVG("number of vehicles") AS avg_vehicles
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1
+ORDER BY avg_vehicles DESC;
+```
+![Query result](sql_result_6.png)
+
+**Conclusion:**  
+No meaningful pattern detected.
+
+---
+
+## 7.7 Which roads are most dangerous in rain?
+
+```sql
+SELECT
+    "road class" AS road_class,
+    CASE 
+        WHEN total_precip = 0 THEN 'No Rain'
+        WHEN total_precip > 0 AND total_precip <= 5 THEN 'Light Rain'
+        ELSE 'Heavy Rain'
+    END AS rain_group,
+    COUNT(*) AS accidents
+FROM traffic_project_db.curated_accident_weather
+GROUP BY 1, 2
+ORDER BY road_class, accidents DESC;
+```
+![Query result](sql_result_7.png)
+**Conclusion:**  
+B-roads (class 3) show the highest accident frequency under rain,  
+while motorways perform significantly better-
+
+---
+
+# 8️. Correlation Analysis
+
+---
+
+## Temperature vs Severity
+
+```sql
+SELECT 
+    corr(
+        avg_temp,
+        CAST("casualty class" AS DOUBLE)
+    ) AS temp_severity_correlation
+FROM traffic_project_db.curated_accident_weather;
+```
+
+**Result:** `-0.04027` → No significant correlation
+
+---
+
+## Wind vs Number of Vehicles
+
+```sql
+SELECT 
+    corr(
+        avg_wind,
+        CAST("number of vehicles" AS DOUBLE)
+    ) AS wind_vehicles_correlation
+FROM traffic_project_db.curated_accident_weather;
+```
+
+**Result:** `0.0009759` → No significant correlation
+
+---
+
+## Rain vs Casualties
+
+```sql
+SELECT 
+    corr(
+        total_precip,
+        CAST("casualty number" AS DOUBLE)
+    ) AS rain_casualties_correlation
+FROM traffic_project_db.curated_accident_weather;
+```
+![Query result](sql_result_8.png)
+
+**Conclusion:**  
+Weak positive relationship — rainfall slightly increases casualty counts, but not strongly.
+
+---
+
+# 9️. Note on Visualization (QuickSight Limitation)
+
+Amazon QuickSight was originally planned as the visualization layer.  
+However, AWS Academy Learner Lab does **not** allow QuickSight usage.
+
+---
+
 
 
 
