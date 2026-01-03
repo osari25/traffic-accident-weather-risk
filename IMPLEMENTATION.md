@@ -573,7 +573,9 @@ Amazon QuickSight was originally planned as the visualization layer.
 However, AWS Academy Learner Lab does **not** allow QuickSight usage.
 
 ---
+# 10. Final Outcome
 
+The pipeline successfully demonstrated that weather information can meaningfully support emergency readiness planning. **Windy conditions and rainy weather (especially on B-roads)** are associated with increased accident risk, providing valuable insights for staffing and resource allocation.
 
 
 
