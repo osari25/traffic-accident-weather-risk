@@ -342,9 +342,6 @@ WHERE a.date IS NOT NULL
 ```
 
 Result:
-- Stored as **Parquet** (faster + cheaper queries)
-- Saved in curated S3 folder
-- Ready for analysis
 
 ![Table Preview](curated_accident_weather-table-preview.csv)
 
